@@ -24,9 +24,13 @@ class VoiceControlService : Service(), RecognitionListener {
 
     override fun onCreate() {
         super.onCreate()
-        startForegroundWithNotification("Sumaiya", "Starting...")
-        showToast("Sumaiya service started")
-        initModel()
+        try {
+            startForegroundWithNotification("Sumaiya", "Starting...")
+            showToast("Sumaiya service started")
+            initModel()
+        } catch (e: Exception) {
+            showToast("CRASH in onCreate: ${e.message}")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -117,7 +121,11 @@ class VoiceControlService : Service(), RecognitionListener {
             .setOngoing(true)
             .build()
 
-        startForeground(1, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+        } else {
+            startForeground(1, notification)
+        }
     }
 
     private fun updateNotification(text: String) {
