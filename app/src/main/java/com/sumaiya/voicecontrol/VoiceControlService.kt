@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import org.vosk.Model
 import org.vosk.Recognizer
@@ -19,10 +20,12 @@ class VoiceControlService : Service(), RecognitionListener {
     private var model: Model? = null
     private var speechService: SpeechService? = null
     private val channelId = "sumaiya_voice_channel"
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
         startForegroundWithNotification("Sumaiya", "Starting...")
+        showToast("Sumaiya service started")
         initModel()
     }
 
@@ -36,10 +39,12 @@ class VoiceControlService : Service(), RecognitionListener {
             { loadedModel ->
                 model = loadedModel
                 updateNotification("Model loaded. Listening...")
+                showToast("Model loaded, listening")
                 startListening()
             },
             { exception ->
                 updateNotification("Model ERROR: ${exception.message}")
+                showToast("Model error: ${exception.message}")
             }
         )
     }
@@ -53,6 +58,7 @@ class VoiceControlService : Service(), RecognitionListener {
                 updateNotification("Listening now...")
             } catch (e: Exception) {
                 updateNotification("Listen ERROR: ${e.message}")
+                showToast("Listen error: ${e.message}")
             }
         }
     }
@@ -62,6 +68,7 @@ class VoiceControlService : Service(), RecognitionListener {
             val text = JSONObject(it).optString("text", "")
             updateNotification("Heard: \"$text\"")
             if (text.isNotEmpty()) {
+                showToast("Heard: $text")
                 CommandExecutor(applicationContext).execute(text)
             }
         }
@@ -79,17 +86,24 @@ class VoiceControlService : Service(), RecognitionListener {
     override fun onFinalResult(hypothesis: String?) {}
     override fun onError(exception: Exception?) {
         updateNotification("Error: ${exception?.message}")
+        showToast("Recognition error: ${exception?.message}")
     }
     override fun onTimeout() {
         updateNotification("Timeout, restarting...")
-        Handler(Looper.getMainLooper()).postDelayed({ startListening() }, 500)
+        mainHandler.postDelayed({ startListening() }, 500)
+    }
+
+    private fun showToast(msg: String) {
+        mainHandler.post {
+            Toast.makeText(applicationContext, msg, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun startForegroundWithNotification(title: String, text: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId, "Sumaiya Voice Control",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_HIGH
             )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
@@ -99,6 +113,7 @@ class VoiceControlService : Service(), RecognitionListener {
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .build()
 
@@ -110,6 +125,7 @@ class VoiceControlService : Service(), RecognitionListener {
             .setContentTitle("Sumaiya")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .build()
         val manager = getSystemService(NotificationManager::class.java)
